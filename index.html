@@ -480,14 +480,48 @@
   const form = document.getElementById('email-form');
   const email = document.getElementById('email');
   const success = document.getElementById('success');
-  form.addEventListener('submit', (e) => {
+  const submitButton = form.querySelector('button');
+
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!email.checkValidity()) { email.reportValidity(); return; }
-    const signups = JSON.parse(localStorage.getItem('zist-signups') || '[]');
-    if (!signups.includes(email.value.trim())) signups.push(email.value.trim());
-    localStorage.setItem('zist-signups', JSON.stringify(signups));
-    success.style.display = 'block';
-    form.querySelector('button').textContent = 'You’re in ✓';
+    if (!email.checkValidity()) {
+      email.reportValidity();
+      return;
+    }
+
+    const originalLabel = submitButton.innerHTML;
+    submitButton.disabled = true;
+    submitButton.textContent = 'Joining...';
+    success.style.display = 'none';
+    success.style.color = '#244b43';
+
+    try {
+      const response = await fetch('/api/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.value.trim() })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Something went wrong. Please try again.');
+      }
+
+      success.textContent = result.alreadySignedUp
+        ? "You're already on the ZIST list."
+        : "You're in. We'll send your first assessment here.";
+      success.style.display = 'block';
+      email.value = '';
+      submitButton.textContent = 'You’re in ✓';
+    } catch (err) {
+      success.textContent = err.message || 'Something went wrong. Please try again.';
+      success.style.color = '#8b3b32';
+      success.style.display = 'block';
+      submitButton.innerHTML = originalLabel;
+    } finally {
+      submitButton.disabled = false;
+    }
   });
 </script>
 </body>
