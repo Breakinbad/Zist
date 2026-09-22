@@ -127,6 +127,13 @@
     .form-row input{width:100%;border:1px solid rgba(17,60,53,.14);background:rgba(255,255,255,.96);border-radius:999px;padding:16px 20px;outline:none;margin-bottom:11px;color:#233b38;box-shadow:0 8px 22px rgba(72,74,65,.06)}
     .form-row .btn{width:100%}
     .fine{font-size:11px;color:#64716d;text-align:center;margin-top:10px}
+    .consent{max-width:650px;margin:11px auto 0;line-height:1.55}
+    .consent a{color:#365f55;text-decoration:underline;text-underline-offset:2px}
+    .privacy-note{background:#f8f4ed;border-top:1px solid rgba(45,78,70,.10)}
+    .privacy-inner{padding-top:34px;padding-bottom:34px;max-width:900px}
+    .privacy-inner h3{font-family:Georgia,"Times New Roman",serif;font-size:24px;font-weight:500;margin:0 0 8px;color:#244b43}
+    .privacy-inner p{margin:0;color:#5a6865;font-size:12.5px;line-height:1.7;max-width:860px}
+
     .success{display:none;font-size:12px;color:#2c5b48;text-align:center;margin-top:10px}
 
     footer{background:#fffdfa;border-top:1px solid rgba(17,60,53,.06);padding:26px 0 34px}
@@ -458,7 +465,7 @@
         <form class="form-row" id="email-form">
           <input id="email" type="email" required autocomplete="email" placeholder="Where should we send your first assessment?" aria-label="Email address" />
           <button class="btn" type="submit">Discover your ZIST <span>→</span></button>
-          <div class="fine">No spam. Just science-backed insights for a better you.</div>
+          <div class="fine consent">By signing up, you agree to receive your ZIST assessment and occasional product updates. You can unsubscribe at any time. We use your email to send ZIST communications and do not sell it. <a href="#privacy">Privacy details</a>.</div>
           <div class="success" id="success">You're in. We'll send your first assessment here.</div>
         </form>
       </div>
@@ -466,11 +473,18 @@
   </section>
 </main>
 
+<section class="privacy-note" id="privacy" aria-labelledby="privacy-title">
+  <div class="wrap privacy-inner">
+    <h3 id="privacy-title">Privacy</h3>
+    <p>When you sign up, ZIST collects your email address so we can send your assessment and occasional product updates. We do not sell your email address. You can unsubscribe from marketing emails at any time. If ZIST later collects health-assessment information, we will provide additional information about how that data is used and protected before you submit it.</p>
+  </div>
+</section>
+
 <footer>
   <div class="wrap footer">
     <div class="footer-left"><strong>ZIST</strong><span>Feel better. Know why.</span></div>
     <div class="footer-right">
-      <a href="#">Privacy</a><a href="#">Terms</a><a href="#signup">Contact</a>
+      <a href="#privacy">Privacy</a><a href="#">Terms</a><a href="#signup">Contact</a>
       <div class="social" aria-label="Social media"><span>◎</span><span>in</span><span>𝕏</span></div>
     </div>
   </div>
