@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/a/:token",
+      "destination": "/assessment.html?token=:token"
+    }
+  ]
+}
