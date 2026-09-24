@@ -150,11 +150,43 @@
       const r = await fetch(`/api/assessment/get?token=${encodeURIComponent(token)}`, { cache: 'no-store' });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Could not load assessment.');
-      state.payload = data;
-      state.questions = data.questions || [];
+
+      const assessment = data.assessment || data;
+
+      state.payload = {
+        participant: {
+          preferredName: assessment.participant?.preferred_name || '',
+          profileComplete: Boolean(
+            assessment.participant?.preferred_name &&
+            assessment.participant?.age_range &&
+            assessment.participant?.gender &&
+            assessment.participant?.sex_at_birth
+          ),
+          profile: assessment.participant || {}
+        },
+        instance: {
+          id: assessment.id,
+          status: assessment.status,
+          overallScore: assessment.overallScore
+        },
+        type: assessment.type,
+        resultSummary: assessment.resultSummary,
+        domainScores: assessment.domainScores || [],
+        responses: assessment.responses || []
+      };
+
+      state.questions = assessment.questions || [];
       prefillProfile();
-      if (data.instance.status === 'completed' && data.result) renderResults(data.result);
-      else renderIntro();
+
+      if (assessment.status === 'completed') {
+        renderResults({
+          overallScore: assessment.overallScore,
+          domainScores: assessment.domainScores || [],
+          summary: assessment.resultSummary || {}
+        });
+      } else {
+        renderIntro();
+      }
     } catch (e) { fail(e.message); }
   }
 
@@ -340,7 +372,9 @@
 
   function renderResults(result) {
     const summary = result.summary || {};
-    const domains = result.domainScores || [];
+    const domains = Array.isArray(result.domainScores)
+      ? result.domainScores
+      : Object.entries(result.domainScores || {}).map(([domain, score]) => ({ domain, score }));
     const warnings = summary.warnings || [];
     const recs = summary.recommendations || [];
     app.innerHTML = `
