@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sleep & Recovery | Zist Health</title>
+  <style>
+    :root {
+      --ink: #16211d;
+      --muted: #66736e;
+      --line: #dce5e1;
+      --soft: #f4f8f6;
+      --brand: #1d5b4f;
+      --brand2: #2f7d6c;
+      --warn: #8a4b12;
+      --warnbg: #fff7ed;
+      --danger: #8a2330;
+      --dangerbg: #fff1f2;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #f4f8f6 0, #ffffff 34%);
+      color: var(--ink);
+    }
+    .shell { width: min(760px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 72px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 38px; }
+    .mark { width: 34px; height: 34px; border-radius: 50%; background: var(--brand); display: grid; place-items:center; color:white; font-weight:900; }
+    .card { background: white; border: 1px solid var(--line); border-radius: 24px; padding: 30px; box-shadow: 0 20px 60px rgba(23, 52, 44, .07); }
+    h1 { font-size: clamp(30px, 5vw, 46px); line-height: 1.04; letter-spacing: -0.04em; margin: 0 0 16px; }
+    h2 { font-size: 26px; letter-spacing: -0.03em; margin: 0 0 12px; }
+    h3 { font-size: 18px; margin: 0 0 8px; }
+    p { line-height: 1.65; }
+    .muted { color: var(--muted); }
+    .eyebrow { color: var(--brand); font-size: 13px; text-transform: uppercase; letter-spacing: .12em; font-weight: 800; margin-bottom: 12px; }
+    .progress-wrap { margin-bottom: 22px; }
+    .progress-meta { display:flex; justify-content:space-between; color:var(--muted); font-size:13px; margin-bottom:8px; }
+    .progress { height: 8px; background: #e9efec; border-radius: 100px; overflow:hidden; }
+    .progress > div { height:100%; background:var(--brand2); width:0; transition: width .2s ease; }
+    .question { font-size: 27px; line-height: 1.25; letter-spacing:-0.025em; margin: 12px 0 8px; }
+    .help { color:var(--muted); margin: 0 0 20px; }
+    .options { display:grid; gap:10px; margin-top:20px; }
+    .option { display:flex; gap:12px; align-items:flex-start; border:1px solid var(--line); border-radius:15px; padding:14px 15px; cursor:pointer; transition:.15s ease; }
+    .option:hover { border-color:#a9c2ba; background:#fbfdfc; }
+    .option:has(input:checked) { border-color:var(--brand2); background:#eff8f4; }
+    .option input { margin-top:3px; accent-color:var(--brand); }
+    input[type="text"] { width:100%; border:1px solid var(--line); border-radius:14px; padding:14px 15px; font:inherit; color:var(--ink); outline:none; }
+    input[type="text"]:focus { border-color:var(--brand2); box-shadow:0 0 0 3px rgba(47,125,108,.12); }
+    .other-input { margin-top:10px; }
+    .actions { display:flex; justify-content:space-between; gap:12px; margin-top:28px; }
+    button, .button { border:0; border-radius:999px; padding:13px 20px; font:inherit; font-weight:750; cursor:pointer; text-decoration:none; display:inline-flex; justify-content:center; align-items:center; }
+    .primary { background:var(--brand); color:white; }
+    .secondary { background:var(--soft); color:var(--ink); }
+    button:disabled { opacity:.45; cursor:not-allowed; }
+    .error { color:var(--danger); background:var(--dangerbg); border-radius:12px; padding:11px 13px; margin-top:16px; display:none; }
+    .consent { display:flex; gap:12px; border:1px solid var(--line); background:var(--soft); padding:16px; border-radius:14px; margin:24px 0; }
+    .consent input { margin-top:4px; accent-color:var(--brand); }
+    .score { font-size:72px; line-height:1; letter-spacing:-.06em; font-weight:850; margin:12px 0; }
+    .score small { font-size:22px; color:var(--muted); letter-spacing:0; font-weight:650; }
+    .domain { margin:18px 0; }
+    .domain-head { display:flex; justify-content:space-between; gap:10px; margin-bottom:7px; font-size:14px; }
+    .bar { height:9px; background:#edf1ef; border-radius:99px; overflow:hidden; }
+    .bar span { display:block; height:100%; background:var(--brand2); border-radius:99px; }
+    .result-box { padding:18px; border-radius:16px; background:var(--soft); margin:18px 0; }
+    .warning { padding:16px; border-radius:14px; margin:12px 0; background:var(--warnbg); border:1px solid #fed7aa; }
+    .warning.important { background:var(--dangerbg); border-color:#fecdd3; }
+    .recs { display:grid; gap:12px; margin-top:16px; }
+    .rec { border:1px solid var(--line); border-radius:16px; padding:16px; }
+    .cta { background:var(--brand); color:white; padding:22px; border-radius:18px; margin-top:26px; }
+    .cta p { color:#dcebe6; }
+    .loading { text-align:center; padding:80px 20px; color:var(--muted); }
+    .foot { margin-top:24px; font-size:12px; color:var(--muted); line-height:1.6; }
+    @media (max-width: 600px) {
+      .shell { width:min(100% - 20px, 760px); padding-top:18px; }
+      .card { padding:22px 18px; border-radius:20px; }
+      .question { font-size:23px; }
+      .actions { flex-direction:column-reverse; }
+      button, .button { width:100%; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <div class="brand"><div class="mark">Z</div><div>Zist Health</div></div>
+    <div id="app" class="card"><div class="loading">Loading your assessment...</div></div>
+  </main>
+
+<script>
+(() => {
+  const app = document.getElementById('app');
+  const params = new URLSearchParams(location.search);
+  const token = params.get('token');
+  const state = {
+    payload: null,
+    questions: [],
+    answers: {},
+    index: 0,
+    consentAccepted: false,
+    policyVersion: '2026-09-v1',
+  };
+
+  const esc = (s='') => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+  const answerValue = (a) => a && typeof a === 'object' && !Array.isArray(a) && 'value' in a ? a.value : a;
+  const multiValues = (a) => Array.isArray(a) ? a : (a && Array.isArray(a.values) ? a.values : []);
+
+  function visible(q) {
+    if (state.payload?.participant?.profileComplete && q.profile_field) return false;
+    if (!q.display_if) return true;
+    const current = answerValue(state.answers[q.display_if.question_key]);
+    if (Array.isArray(q.display_if.in)) return q.display_if.in.includes(current);
+    return current === q.display_if.equals;
+  }
+
+  function visibleQuestions() { return state.questions.filter(visible); }
+
+  function prefillProfile() {
+    const p = state.payload?.participant?.profile;
+    if (!p) {
+      if (state.payload?.participant?.preferredName) state.answers.q1 = state.payload.participant.preferredName;
+      return;
+    }
+    for (const q of state.questions.filter(q => q.profile_field)) {
+      const stored = p[q.profile_field];
+      if (stored == null) continue;
+      if (q.question_type === 'multiple_choice') {
+        const labels = Array.isArray(stored) ? stored : [];
+        const values = labels.map(label => q.options?.find(o => o.label === label)?.value).filter(Boolean);
+        state.answers[q.question_key] = { values, otherText: '' };
+      } else if (q.question_type === 'text') {
+        state.answers[q.question_key] = stored;
+      } else {
+        const match = q.options?.find(o => o.label === stored);
+        if (match) state.answers[q.question_key] = match.value;
+      }
+    }
+  }
+
+  async function load() {
+    if (!token) return fail('This assessment link is missing its secure token.');
+    try {
+      const r = await fetch(`/api/assessment/get?token=${encodeURIComponent(token)}`, { cache: 'no-store' });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Could not load assessment.');
+      state.payload = data;
+      state.questions = data.questions || [];
+      prefillProfile();
+      if (data.instance.status === 'completed' && data.result) renderResults(data.result);
+      else renderIntro();
+    } catch (e) { fail(e.message); }
+  }
+
+  function fail(message) {
+    app.innerHTML = `<div class="eyebrow">Zist Health</div><h2>We could not open this assessment</h2><p class="muted">${esc(message)}</p>`;
+  }
+
+  function renderIntro() {
+    const name = state.payload.participant.preferredName ? `, ${esc(state.payload.participant.preferredName)}` : '';
+    app.innerHTML = `
+      <div class="eyebrow">Sleep & Recovery</div>
+      <h1>Understand how well your sleep is supporting you${name}.</h1>
+      <p class="muted">This assessment looks at sleep duration, quality, daytime recovery, regularity, and sleep-supporting habits. Think about your typical sleep over the past <strong>2 weeks</strong>. It takes about 5 minutes.</p>
+      <div class="consent">
+        <input id="consent" type="checkbox" />
+        <label for="consent">Zist may store my responses and use them to calculate wellness scores and provide personalized wellness guidance. I understand this assessment does not provide medical diagnosis or treatment.</label>
+      </div>
+      <button id="begin" class="primary">Begin assessment</button>
+      <div class="foot">Your assessment link is unique to you. Do not forward it to someone else.</div>
+    `;
+    document.getElementById('consent').addEventListener('change', e => state.consentAccepted = e.target.checked);
+    document.getElementById('begin').addEventListener('click', () => {
+      if (!state.consentAccepted) {
+        const box = document.querySelector('.consent');
+        box.style.borderColor = '#fda4af';
+        return;
+      }
+      state.index = 0;
+      renderQuestion();
+    });
+  }
+
+  function renderQuestion() {
+    const qs = visibleQuestions();
+    if (!qs.length) return fail('No questions are configured for this assessment.');
+    if (state.index >= qs.length) state.index = qs.length - 1;
+    const q = qs[state.index];
+    const pct = Math.round(((state.index + 1) / qs.length) * 100);
+
+    app.innerHTML = `
+      <div class="progress-wrap">
+        <div class="progress-meta"><span>${esc(q.section || '')}</span><span>${state.index + 1} of ${qs.length}</span></div>
+        <div class="progress"><div style="width:${pct}%"></div></div>
+      </div>
+      <div class="question">${esc(q.prompt)}</div>
+      ${q.help_text ? `<p class="help">${esc(q.help_text)}</p>` : ''}
+      <div id="input"></div>
+      <div id="err" class="error"></div>
+      <div class="actions">
+        <button id="back" class="secondary" ${state.index === 0 ? 'disabled' : ''}>Back</button>
+        <button id="next" class="primary">${state.index === qs.length - 1 ? 'See my results' : 'Continue'}</button>
+      </div>
+    `;
+
+    renderInput(q);
+    document.getElementById('back').addEventListener('click', () => { state.index--; renderQuestion(); });
+    document.getElementById('next').addEventListener('click', async () => {
+      const err = validate(q);
+      if (err) return showError(err);
+      if (q.question_key === 'q3' && answerValue(state.answers.q3) === 'under_18') {
+        return showError('The current Zist Sleep & Recovery assessment is designed for adults age 18 and older.');
+      }
+      const current = visibleQuestions();
+      if (state.index >= current.length - 1) await submit();
+      else { state.index++; renderQuestion(); }
+    });
+  }
+
+  function renderInput(q) {
+    const host = document.getElementById('input');
+    const existing = state.answers[q.question_key];
+
+    if (q.question_type === 'text') {
+      host.innerHTML = `<input id="text-answer" type="text" autocomplete="name" value="${esc(existing || '')}" placeholder="Your answer" />`;
+      document.getElementById('text-answer').addEventListener('input', e => state.answers[q.question_key] = e.target.value);
+      return;
+    }
+
+    if (q.question_type === 'single_choice') {
+      const selected = answerValue(existing);
+      host.innerHTML = `<div class="options">${(q.options || []).map(o => `
+        <label class="option">
+          <input type="radio" name="choice" value="${esc(o.value)}" ${selected === o.value ? 'checked' : ''} />
+          <span>${esc(o.label)}</span>
+        </label>`).join('')}</div><div id="other-wrap"></div>`;
+      host.querySelectorAll('input[type=radio]').forEach(input => input.addEventListener('change', e => {
+        const option = q.options.find(o => o.value === e.target.value);
+        const previousText = existing && typeof existing === 'object' ? existing.otherText || '' : '';
+        state.answers[q.question_key] = option?.requires_text ? { value: e.target.value, otherText: previousText } : e.target.value;
+        renderOther(q);
+      }));
+      renderOther(q);
+      return;
+    }
+
+    if (q.question_type === 'multiple_choice') {
+      const selected = multiValues(existing);
+      host.innerHTML = `<div class="options">${(q.options || []).map(o => `
+        <label class="option">
+          <input type="checkbox" value="${esc(o.value)}" ${selected.includes(o.value) ? 'checked' : ''} />
+          <span>${esc(o.label)}</span>
+        </label>`).join('')}</div><div id="other-wrap"></div>`;
+      host.querySelectorAll('input[type=checkbox]').forEach(input => input.addEventListener('change', e => {
+        const exclusive = ['none','nothing','prefer_not_to_answer'];
+        let values = [...multiValues(state.answers[q.question_key])];
+        if (e.target.checked) {
+          if (exclusive.includes(e.target.value)) values = [e.target.value];
+          else values = values.filter(v => !exclusive.includes(v)).concat(e.target.value);
+        } else values = values.filter(v => v !== e.target.value);
+        values = [...new Set(values)];
+        const old = state.answers[q.question_key];
+        state.answers[q.question_key] = { values, otherText: old && old.otherText ? old.otherText : '' };
+        renderInput(q);
+      }));
+      renderOther(q);
+    }
+  }
+
+  function renderOther(q) {
+    const wrap = document.getElementById('other-wrap');
+    if (!wrap) return;
+    const answer = state.answers[q.question_key];
+    const selected = q.question_type === 'multiple_choice' ? multiValues(answer) : [answerValue(answer)];
+    const needsOther = (q.options || []).some(o => o.requires_text && selected.includes(o.value));
+    if (!needsOther) { wrap.innerHTML = ''; return; }
+    const value = answer && typeof answer === 'object' ? answer.otherText || '' : '';
+    wrap.innerHTML = `<input class="other-input" id="other-answer" type="text" value="${esc(value)}" placeholder="Please specify" />`;
+    document.getElementById('other-answer').addEventListener('input', e => {
+      if (q.question_type === 'multiple_choice') state.answers[q.question_key] = { values: multiValues(answer), otherText: e.target.value };
+      else state.answers[q.question_key] = { value: answerValue(answer), otherText: e.target.value };
+    });
+  }
+
+  function validate(q) {
+    if (!q.required) return null;
+    const a = state.answers[q.question_key];
+    const empty = a == null || a === '' || (Array.isArray(a) && !a.length) || (a && Array.isArray(a.values) && !a.values.length);
+    if (empty) return 'Please answer this question before continuing.';
+    const values = q.question_type === 'multiple_choice' ? multiValues(a) : [answerValue(a)];
+    const requiresText = (q.options || []).some(o => o.requires_text && values.includes(o.value));
+    if (requiresText && !(a && typeof a === 'object' && String(a.otherText || '').trim())) return 'Please specify your answer.';
+    return null;
+  }
+
+  function showError(message) {
+    const el = document.getElementById('err');
+    el.textContent = message;
+    el.style.display = 'block';
+  }
+
+  async function submit() {
+    const button = document.getElementById('next');
+    button.disabled = true;
+    button.textContent = 'Saving...';
+    try {
+      const r = await fetch('/api/assessment/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          answers: state.answers,
+          consentAccepted: state.consentAccepted,
+          policyVersion: state.policyVersion,
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Could not save your assessment.');
+      renderResults(data.result);
+    } catch (e) {
+      button.disabled = false;
+      button.textContent = 'See my results';
+      showError(e.message);
+    }
+  }
+
+  const domainNames = {
+    sleep_duration: 'Sleep Duration & Opportunity',
+    sleep_quality: 'Sleep Quality & Continuity',
+    daytime_recovery: 'Daytime Recovery',
+    regularity: 'Sleep Regularity & Body Clock',
+    sleep_habits: 'Sleep-Supporting Habits',
+  };
+
+  function renderResults(result) {
+    const summary = result.summary || {};
+    const domains = result.domainScores || [];
+    const warnings = summary.warnings || [];
+    const recs = summary.recommendations || [];
+    app.innerHTML = `
+      <div class="eyebrow">Your Sleep & Recovery Results</div>
+      <h1>${esc(summary.band || 'Your results')}</h1>
+      <div class="score">${Math.round(Number(result.overallScore || 0))}<small>/100</small></div>
+      <p class="muted">${esc(summary.description || '')}</p>
+
+      <div class="result-box">
+        <h3>Strongest area</h3>
+        <div>${esc(summary.strongest_domain_label || '')}</div>
+      </div>
+      <div class="result-box">
+        <h3>Biggest opportunity</h3>
+        <div>${esc(summary.weakest_domain_label || '')}</div>
+      </div>
+
+      <h2 style="margin-top:30px">Your five sleep domains</h2>
+      ${domains.map(d => `
+        <div class="domain">
+          <div class="domain-head"><span>${esc(domainNames[d.domain] || d.domain)}</span><strong>${Number(d.score).toFixed(1)}/20</strong></div>
+          <div class="bar"><span style="width:${Math.min(100, Number(d.score) / 20 * 100)}%"></span></div>
+        </div>`).join('')}
+
+      ${warnings.length ? `<h2 style="margin-top:30px">Worth paying attention to</h2>${warnings.map(w => `
+        <div class="warning ${w.level === 'important' ? 'important' : ''}"><h3>${esc(w.title)}</h3><div>${esc(w.text)}</div></div>`).join('')}` : ''}
+
+      <h2 style="margin-top:30px">Your next 3 actions</h2>
+      <div class="recs">${recs.map((r,i) => `<div class="rec"><h3>${i+1}. ${esc(r.title)}</h3><div class="muted">${esc(r.text)}</div></div>`).join('')}</div>
+
+      <div class="cta">
+        <h2>Want a personalized health plan?</h2>
+        <p>Your Zist profile can eventually combine sleep with your other assessments to build a plan around your patterns.</p>
+        <a class="button secondary" href="/register">Create my Zist account</a>
+      </div>
+      <div class="foot">This Zist score is a wellness score, not a clinical diagnosis. If symptoms concern you, consider discussing them with a qualified healthcare professional.</div>
+    `;
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>
