@@ -1,149 +1,169 @@
-const { selectOne, insertRows, updateRows } = require('../_lib/supabase');
-const {
-  json,
-  methodNotAllowed,
-  normalizeEmail,
-  validEmail,
-  safeEqual,
-  escapeHtml,
-} = require('../_lib/utils');
+import { createClient } from '@supabase/supabase-js';
 
-function siteUrl(req) {
-  if (process.env.SITE_URL) return process.env.SITE_URL.replace(/\/$/, '');
-  const proto = req.headers['x-forwarded-proto'] || 'https';
-  return `${proto}://${req.headers.host}`;
-}
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseSecretKey =
+  process.env.SUPABASE_SECRET_KEY ||
+  process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-async function sendInviteEmail({ to, preferredName, assessmentName, link }) {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.ASSESSMENT_FROM_EMAIL || 'Zist Health <hello@zisthealth.com>';
-  if (!apiKey) return { sent: false, reason: 'RESEND_API_KEY is not configured.' };
+const supabase = createClient(supabaseUrl, supabaseSecretKey);
 
-  const firstLine = preferredName ? `Hi ${escapeHtml(preferredName)},` : 'Hi,';
-  const safeName = escapeHtml(assessmentName);
-  const safeLink = escapeHtml(link);
-
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from,
-      to: [to],
-      subject: `Your Zist ${assessmentName} assessment is ready`,
-      html: `
-        <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#1f2937;line-height:1.6">
-          <p>${firstLine}</p>
-          <p>Your <strong>${safeName}</strong> assessment is ready. It takes about 5 minutes.</p>
-          <p style="margin:28px 0">
-            <a href="${safeLink}" style="display:inline-block;background:#111827;color:white;text-decoration:none;padding:13px 22px;border-radius:999px;font-weight:700">
-              Take the assessment
-            </a>
-          </p>
-          <p>Your link is unique to you. Please do not forward it.</p>
-          <p style="font-size:13px;color:#6b7280">Zist provides wellness education and is not a substitute for medical diagnosis or treatment.</p>
-        </div>
-      `,
-    }),
-  });
-
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(`Resend failed (${response.status}): ${JSON.stringify(data)}`);
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
-  return { sent: true, id: data.id };
-}
-
-module.exports = async function handler(req, res) {
-  if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
 
   try {
-    if (!process.env.ZIST_ADMIN_KEY) {
-      return json(res, 500, { error: 'ZIST_ADMIN_KEY is not configured.' });
+    const adminKey = req.headers['x-zist-admin-key'];
+
+    if (!adminKey || adminKey !== process.env.ZIST_ADMIN_KEY) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
-    if (!safeEqual(req.headers['x-zist-admin-key'], process.env.ZIST_ADMIN_KEY)) {
-      return json(res, 401, { error: 'Unauthorized.' });
+
+    const {
+      email,
+      assessmentSlug = 'sleep-recovery',
+      sendEmail = false,
+    } = req.body || {};
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
     }
 
-    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
-    const email = normalizeEmail(body.email);
-    const preferredName = String(body.preferredName || '').trim();
-    const assessmentSlug = String(body.assessmentSlug || 'sleep-recovery').trim();
-    const assessmentVersion = Number(body.assessmentVersion || 1);
-    const sendEmail = body.sendEmail !== false;
+    // 1. Find or create participant
+    let { data: participant, error: participantError } = await supabase
+      .from('participants')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle();
 
-    if (!validEmail(email)) return json(res, 400, { error: 'Please provide a valid email.' });
-
-    let participant = await selectOne(
-      'participants',
-      `select=id,email,preferred_name&email=eq.${encodeURIComponent(email)}`
-    );
+    if (participantError) {
+      throw participantError;
+    }
 
     if (!participant) {
-      const inserted = await insertRows('participants', [
-        {
+      const { data, error } = await supabase
+        .from('participants')
+        .insert({
           email,
-          preferred_name: preferredName || null,
-        },
-      ]);
-      participant = inserted[0];
-    } else if (preferredName && !participant.preferred_name) {
-      await updateRows('participants', `id=eq.${participant.id}`, { preferred_name: preferredName });
-      participant.preferred_name = preferredName;
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      participant = data;
     }
 
-    const assessment = await selectOne(
-      'assessment_types',
-      `select=id,slug,name,version&slug=eq.${encodeURIComponent(assessmentSlug)}&version=eq.${assessmentVersion}&active=eq.true`
-    );
+    // 2. Get assessment type
+    const { data: assessmentType, error: assessmentTypeError } =
+      await supabase
+        .from('assessment_types')
+        .select('*')
+        .eq('slug', assessmentSlug)
+        .eq('active', true)
+        .order('version', { ascending: false })
+        .limit(1)
+        .single();
 
-    if (!assessment) return json(res, 404, { error: 'Assessment type not found.' });
-
-    let instance = await selectOne(
-      'assessment_instances',
-      `select=id,access_token,status,email_sent_at,created_at&participant_id=eq.${participant.id}&assessment_type_id=eq.${assessment.id}&status=in.(invited,started)&order=created_at.desc`
-    );
-
-    if (!instance) {
-      const rows = await insertRows('assessment_instances', [
-        {
-          participant_id: participant.id,
-          assessment_type_id: assessment.id,
-          status: 'invited',
-        },
-      ]);
-      instance = rows[0];
+    if (assessmentTypeError) {
+      throw assessmentTypeError;
     }
 
-    const link = `${siteUrl(req)}/a/${instance.access_token}`;
-    let emailResult = { sent: false, reason: 'sendEmail=false' };
+    // 3. Create assessment instance
+    const { data: instance, error: instanceError } = await supabase
+      .from('assessment_instances')
+      .insert({
+        participant_id: participant.id,
+        assessment_type_id: assessmentType.id,
+        status: 'invited',
+      })
+      .select()
+      .single();
 
+    if (instanceError) {
+      throw instanceError;
+    }
+
+    const siteUrl =
+      process.env.SITE_URL || 'https://zisthealth.com';
+
+    const assessmentUrl =
+      `${siteUrl}/a/${instance.access_token}`;
+
+    // 4. Optionally send email
     if (sendEmail) {
-      emailResult = await sendInviteEmail({
-        to: email,
-        preferredName: participant.preferred_name,
-        assessmentName: assessment.name,
-        link,
-      });
-      if (emailResult.sent) {
-        await updateRows('assessment_instances', `id=eq.${instance.id}`, {
-          email_sent_at: new Date().toISOString(),
-        });
+      if (!process.env.RESEND_API_KEY) {
+        throw new Error('RESEND_API_KEY is missing');
       }
+
+      const fromEmail =
+        process.env.ASSESSMENT_FROM_EMAIL ||
+        'Zist Health <assessment@zisthealth.com>';
+
+      const emailResponse = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: fromEmail,
+          to: [email],
+          subject: 'Your Zist Sleep & Recovery Assessment',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px;">
+              <h2>Your Zist assessment is ready</h2>
+              <p>
+                Your Sleep & Recovery Assessment takes about 5 minutes.
+              </p>
+              <p>
+                <a
+                  href="${assessmentUrl}"
+                  style="
+                    display:inline-block;
+                    padding:12px 20px;
+                    background:#111;
+                    color:#fff;
+                    text-decoration:none;
+                    border-radius:8px;
+                  "
+                >
+                  Take the assessment
+                </a>
+              </p>
+              <p>
+                Zist provides wellness education and does not provide
+                medical diagnosis or treatment.
+              </p>
+            </div>
+          `,
+        }),
+      });
+
+      if (!emailResponse.ok) {
+        const errorText = await emailResponse.text();
+        throw new Error(`Resend error: ${errorText}`);
+      }
+
+      await supabase
+        .from('assessment_instances')
+        .update({
+          email_sent_at: new Date().toISOString(),
+        })
+        .eq('id', instance.id);
     }
 
-    return json(res, 200, {
-      ok: true,
+    return res.status(200).json({
+      success: true,
       participantId: participant.id,
       assessmentInstanceId: instance.id,
-      assessment: assessment.name,
-      link,
-      email: emailResult,
+      assessmentUrl,
     });
+
   } catch (error) {
-    console.error('assessment/create error', error);
-    return json(res, error.statusCode || 500, { error: 'Could not create the assessment invitation.' });
+    console.error('Assessment create error:', error);
+
+    return res.status(500).json({
+      error: error.message || 'Internal server error',
+    });
   }
-};
+}
