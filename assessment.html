@@ -90,7 +90,15 @@
 (() => {
   const app = document.getElementById('app');
   const params = new URLSearchParams(location.search);
-  const token = params.get('token');
+
+  let token = params.get('token');
+
+  if (!token) {
+    const parts = location.pathname.split('/').filter(Boolean);
+    if (parts[0] === 'a' && parts[1]) {
+      token = parts[1];
+    }
+  }
   const state = {
     payload: null,
     questions: [],
