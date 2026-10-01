@@ -522,13 +522,15 @@
         throw new Error(result.error || 'Something went wrong. Please try again.');
       }
 
-      success.textContent = result.alreadySignedUp
-        ? "You're already on the ZIST list."
-        : "You're in. We'll send your first assessment here.";
+      success.textContent = result.message;
       success.style.display = 'block';
       email.value = '';
-      submitButton.textContent = 'You’re in ✓';
-    } catch (err) {
+      
+      if (result.emailSent) {
+        submitButton.textContent = 'Check your inbox ✓';
+      } else {
+        submitButton.textContent = 'Signed up ✓';
+      } catch (err) {
       success.textContent = err.message || 'Something went wrong. Please try again.';
       success.style.color = '#8b3b32';
       success.style.display = 'block';
