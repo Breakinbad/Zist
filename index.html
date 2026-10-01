@@ -498,43 +498,79 @@
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+
     if (!email.checkValidity()) {
       email.reportValidity();
       return;
     }
 
     const originalLabel = submitButton.innerHTML;
+
     submitButton.disabled = true;
     submitButton.textContent = 'Joining...';
+
     success.style.display = 'none';
     success.style.color = '#244b43';
 
     try {
       const response = await fetch('/api/signup', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.value.trim() })
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: email.value.trim()
+        })
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Something went wrong. Please try again.');
+        throw new Error(
+          result.error ||
+          'Something went wrong. Please try again.'
+        );
       }
 
-      success.textContent = result.message;
+      // Show the exact message returned by signup.js
+      success.textContent =
+        result.message ||
+        "You're signed up.";
+
+      // Green if email sent, reddish if email failed
+      if (result.emailSent === false) {
+        success.style.color = '#8b3b32';
+      } else {
+        success.style.color = '#244b43';
+      }
+
       success.style.display = 'block';
       email.value = '';
-      
-      if (result.emailSent) {
-        submitButton.textContent = 'Check your inbox ✓';
+
+      if (result.alreadyCompleted) {
+        submitButton.textContent =
+          'Assessment completed ✓';
+      } else if (result.emailSent) {
+        submitButton.textContent =
+          'Check your inbox ✓';
       } else {
-        submitButton.textContent = 'Signed up ✓';
-      } catch (err) {
-      success.textContent = err.message || 'Something went wrong. Please try again.';
+        submitButton.textContent =
+          'Signed up ✓';
+      }
+
+    } catch (err) {
+      console.error('Signup error:', err);
+
+      success.textContent =
+        err.message ||
+        'Something went wrong. Please try again.';
+
       success.style.color = '#8b3b32';
       success.style.display = 'block';
-      submitButton.innerHTML = originalLabel;
+
+      submitButton.innerHTML =
+        originalLabel;
+
     } finally {
       submitButton.disabled = false;
     }
