@@ -101,10 +101,3 @@ create or replace view user_assessments as
   from assessment_instances ai
   join participants p on p.id = ai.participant_id
   join assessment_types at on at.id = ai.assessment_type_id;
-
-alter view user_assessments enable row level security;
-
-drop policy if exists "Users can view own dashboard" on user_assessments;
-create policy "Users can view own dashboard"
-  on user_assessments for select
-  using (user_id = auth.uid());
