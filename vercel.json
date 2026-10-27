@@ -3,6 +3,14 @@
     {
       "source": "/a/:token",
       "destination": "/assessment.html?token=:token"
+    },
+    {
+      "source": "/register",
+      "destination": "/register.html"
+    },
+    {
+      "source": "/dashboard",
+      "destination": "/dashboard.html"
     }
   ]
 }

@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Create your Zist account</title>
+  <meta name="description" content="Create your Zist account to save your assessment results and get a personalized health plan." />
+  <style>
+    :root {
+      --ink: #16211d;
+      --muted: #66736e;
+      --line: #dce5e1;
+      --soft: #f4f8f6;
+      --brand: #1d5b4f;
+      --brand2: #2f7d6c;
+      --danger: #8a2330;
+      --dangerbg: #fff1f2;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #f4f8f6 0, #ffffff 34%);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+    .shell { width: min(480px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 72px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 38px; text-decoration: none; color: var(--ink); }
+    .mark { width: 34px; height: 34px; border-radius: 50%; background: var(--brand); display: grid; place-items: center; color: white; font-weight: 900; font-size: 16px; }
+    .card { background: white; border: 1px solid var(--line); border-radius: 24px; padding: 34px; box-shadow: 0 20px 60px rgba(23,52,44,.07); }
+    h1 { font-size: clamp(26px, 5vw, 34px); line-height: 1.08; letter-spacing: -0.035em; margin: 0 0 8px; }
+    h2 { font-size: 20px; margin: 0 0 6px; }
+    .eyebrow { color: var(--brand); font-size: 12px; text-transform: uppercase; letter-spacing: .14em; font-weight: 700; margin-bottom: 14px; }
+    .muted { color: var(--muted); font-size: 14px; line-height: 1.6; margin: 0 0 24px; }
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--ink); }
+    .field input { width: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 14px 15px; font: inherit; color: var(--ink); outline: none; transition: border .15s ease, box-shadow .15s ease; }
+    .field input:focus { border-color: var(--brand2); box-shadow: 0 0 0 3px rgba(47,125,108,.12); }
+    button { width: 100%; border: 0; border-radius: 999px; padding: 14px 20px; font: inherit; font-weight: 700; cursor: pointer; background: var(--brand); color: white; transition: background .15s ease; }
+    button:hover { background: var(--brand2); }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .toggle { text-align: center; margin-top: 22px; font-size: 14px; color: var(--muted); }
+    .toggle a { color: var(--brand); font-weight: 600; text-decoration: none; cursor: pointer; }
+    .toggle a:hover { text-decoration: underline; }
+    .error { color: var(--danger); background: var(--dangerbg); border-radius: 12px; padding: 12px 14px; margin-top: 16px; font-size: 13px; display: none; }
+    .info-box { background: var(--soft); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 24px; }
+    .info-box h2 { margin: 0 0 4px; }
+    .info-box p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.55; }
+    .loading { text-align: center; padding: 60px 20px; color: var(--muted); }
+    .foot { margin-top: 28px; font-size: 12px; color: var(--muted); line-height: 1.6; text-align: center; }
+    .foot a { color: var(--brand); text-decoration: none; }
+    @media (max-width: 600px) {
+      .shell { width: min(100% - 20px, 480px); }
+      .card { padding: 24px 18px; border-radius: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <a class="brand" href="/"><div class="mark">Z</div><div>Zist Health</div></a>
+    <div id="app" class="card"><div class="loading">Loading…</div></div>
+    <div class="foot">
+      Zist provides wellness education and does not provide medical diagnosis or treatment.<br />
+      <a href="/">Back to home</a>
+    </div>
+  </main>
+
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+    const app = document.getElementById('app');
+
+    // ── Read the assessment token from the URL ──
+    const params = new URLSearchParams(location.search);
+    const assessmentToken = params.get('token') || '';
+
+    // ── Fetch public Supabase config ──
+    let supabase;
+
+    async function init() {
+      try {
+        const res = await fetch('/api/auth-config');
+        if (!res.ok) throw new Error('Could not load authentication config');
+        const { url, anonKey, error } = await res.json();
+        if (error) throw new Error(error);
+        supabase = createClient(url, anonKey, {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true,
+          },
+        });
+
+        // ── Check if already signed in ──
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          // Already authenticated — link the assessment if we have a token
+          if (assessmentToken) {
+            await linkAssessment(session.access_token);
+          }
+          redirectToDashboard();
+          return;
+        }
+
+        renderAuthForm();
+      } catch (err) {
+        app.innerHTML = `<div class="error" style="display:block">${escHtml(err.message)}</div>`;
+      }
+    }
+
+    function escHtml(s) {
+      return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+    }
+
+    let isSignUp = true;
+
+    function renderAuthForm() {
+      const hasToken = Boolean(assessmentToken);
+
+      app.innerHTML = `
+        <div class="eyebrow">${hasToken ? 'Save your results' : 'Welcome'}</div>
+        <h1>${hasToken ? 'Create your Zist account' : 'Sign in to Zist'}</h1>
+        <p class="muted">${
+          hasToken
+            ? 'Save your Sleep &amp; Recovery results, track progress over time, and get a personalized health plan.'
+            : 'Access your saved assessments and health dashboard.'
+        }</p>
+
+        ${hasToken ? `
+          <div class="info-box">
+            <h2>Your results are ready</h2>
+            <p>Once you create an account, we'll securely link your assessment results to your profile.</p>
+          </div>
+        ` : ''}
+
+        <form id="auth-form">
+          <div class="field">
+            <label for="email">Email</label>
+            <input id="email" type="email" required autocomplete="email" placeholder="you@example.com" />
+          </div>
+          <div class="field">
+            <label for="password">Password</label>
+            <input id="password" type="password" required minlength="8" autocomplete="current-password" placeholder="At least 8 characters" />
+          </div>
+          <button type="submit" id="submit-btn">${isSignUp ? 'Create account' : 'Sign in'}</button>
+          <div class="error" id="error-msg"></div>
+        </form>
+
+        <div class="toggle">
+          ${isSignUp ? 'Already have an account?' : 'New to Zist?'}
+          <a id="toggle-mode">${isSignUp ? 'Sign in' : 'Create account'}</a>
+        </div>
+      `;
+
+      // ── Toggle between sign up and sign in ──
+      document.getElementById('toggle-mode').addEventListener('click', (e) => {
+        e.preventDefault();
+        isSignUp = !isSignUp;
+        renderAuthForm();
+      });
+
+      // ── Handle form submit ──
+      document.getElementById('auth-form').addEventListener('submit', handleAuth);
+    }
+
+    async function handleAuth(e) {
+      e.preventDefault();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const btn = document.getElementById('submit-btn');
+      const errEl = document.getElementById('error-msg');
+
+      errEl.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Please wait…';
+
+      try {
+        let result;
+        if (isSignUp) {
+          result = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: `${location.origin}/register`,
+            },
+          });
+        } else {
+          result = await supabase.auth.signInWithPassword({ email, password });
+        }
+
+        if (result.error) throw result.error;
+
+        // ── If email confirmation is required (sign up) ──
+        if (isSignUp && result.data?.user && !result.data?.session) {
+          app.innerHTML = `
+            <div class="eyebrow">Check your inbox</div>
+            <h1>Confirm your email</h1>
+            <p class="muted">We sent a confirmation link to <strong>${escHtml(email)}</strong>. Click the link to activate your account, then return here to sign in and save your results.</p>
+            <div class="info-box">
+              <h2>After confirming</h2>
+              <p>Come back to this page and sign in. Your assessment results will be saved to your account automatically.</p>
+            </div>
+            <div class="toggle">Already confirmed? <a id="to-signin">Sign in</a></div>
+          `;
+          document.getElementById('to-signin').addEventListener('click', (e) => {
+            e.preventDefault();
+            isSignUp = false;
+            renderAuthForm();
+          });
+          return;
+        }
+
+        // ── Authenticated — link assessment if we have a token ──
+        if (result.data?.session) {
+          if (assessmentToken) {
+            btn.textContent = 'Saving your results…';
+            await linkAssessment(result.data.session.access_token);
+          }
+          redirectToDashboard();
+        }
+      } catch (err) {
+        errEl.textContent = err.message || 'Something went wrong. Please try again.';
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = isSignUp ? 'Create account' : 'Sign in';
+      }
+    }
+
+    async function linkAssessment(accessToken) {
+      try {
+        await fetch('/api/link-assessment', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ token: assessmentToken }),
+        });
+        // Non-blocking — even if linking fails, the user can still
+        // access their dashboard. We don't want to block the redirect.
+      } catch (e) {
+        console.error('Link assessment failed:', e);
+      }
+    }
+
+    function redirectToDashboard() {
+      window.location.href = '/dashboard';
+    }
+
+    init();
+  </script>
+</body>
+</html>

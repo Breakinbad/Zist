@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Your Zist Dashboard</title>
+  <meta name="description" content="Your personalized health dashboard — saved assessment results, progress tracking, and recommendations." />
+  <style>
+    :root {
+      --ink: #16211d;
+      --muted: #66736e;
+      --line: #dce5e1;
+      --soft: #f4f8f6;
+      --brand: #1d5b4f;
+      --brand2: #2f7d6c;
+      --warn: #8a4b12;
+      --warnbg: #fff7ed;
+      --danger: #8a2330;
+      --dangerbg: #fff1f2;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #f4f8f6 0, #ffffff 34%);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+    .shell { width: min(760px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 72px; }
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 36px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: -0.02em; text-decoration: none; color: var(--ink); }
+    .mark { width: 34px; height: 34px; border-radius: 50%; background: var(--brand); display: grid; place-items: center; color: white; font-weight: 900; font-size: 16px; }
+    .signout { font-size: 13px; color: var(--muted); background: none; border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px; cursor: pointer; transition: border .15s ease, color .15s ease; width: auto; }
+    .signout:hover { border-color: var(--brand2); color: var(--brand); }
+    h1 { font-size: clamp(28px, 5vw, 42px); line-height: 1.04; letter-spacing: -0.035em; margin: 0 0 8px; }
+    h2 { font-size: 22px; margin: 0 0 12px; }
+    h3 { font-size: 16px; margin: 0 0 6px; }
+    .eyebrow { color: var(--brand); font-size: 13px; text-transform: uppercase; letter-spacing: .12em; font-weight: 800; margin-bottom: 12px; }
+    .muted { color: var(--muted); }
+    .loading { text-align: center; padding: 80px 20px; color: var(--muted); }
+    .card { background: white; border: 1px solid var(--line); border-radius: 20px; padding: 28px; box-shadow: 0 16px 48px rgba(23,52,44,.06); margin-bottom: 20px; }
+    .score-row { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+    .score-big { font-size: 56px; font-weight: 850; letter-spacing: -0.055em; line-height: 1; }
+    .score-big small { font-size: 18px; color: var(--muted); font-weight: 600; }
+    .assessment-name { font-size: 14px; color: var(--brand); font-weight: 600; margin-bottom: 10px; text-transform: uppercase; letter-spacing: .08em; }
+    .completed-date { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
+    .domain { margin: 14px 0; }
+    .domain-head { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 7px; font-size: 14px; }
+    .bar { height: 8px; background: #edf1ef; border-radius: 99px; overflow: hidden; }
+    .bar span { display: block; height: 100%; background: var(--brand2); border-radius: 99px; transition: width .6s ease; }
+    .result-box { padding: 16px; border-radius: 14px; background: var(--soft); margin: 16px 0; }
+    .recs { display: grid; gap: 12px; margin-top: 16px; }
+    .rec { border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+    .warning { padding: 14px; border-radius: 12px; margin: 10px 0; background: var(--warnbg); border: 1px solid #fed7aa; font-size: 13px; line-height: 1.6; }
+    .warning.important { background: var(--dangerbg); border-color: #fecdd3; }
+    .empty-state { text-align: center; padding: 60px 20px; }
+    .empty-state h2 { margin: 0 0 10px; }
+    .empty-state p { color: var(--muted); font-size: 15px; margin: 0 0 24px; }
+    .start-btn { display: inline-block; background: var(--brand); color: white; border-radius: 999px; padding: 13px 26px; font-weight: 700; text-decoration: none; font-size: 15px; transition: background .15s ease; }
+    .start-btn:hover { background: var(--brand2); }
+    .foot { margin-top: 28px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+    @media (max-width: 600px) {
+      .shell { width: min(100% - 20px, 760px); }
+      .card { padding: 22px 18px; }
+      .score-big { font-size: 46px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <div class="header">
+      <a class="brand" href="/"><div class="mark">Z</div><div>Zist Health</div></a>
+      <button class="signout" id="signout-btn">Sign out</button>
+    </div>
+    <div id="app"><div class="loading">Loading your dashboard…</div></div>
+    <div class="foot">
+      Zist provides wellness education and does not provide medical diagnosis or treatment.
+    </div>
+  </main>
+
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+    const app = document.getElementById('app');
+
+    let supabase;
+
+    function escHtml(s) {
+      return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+    }
+
+    const DOMAIN_LABELS = {
+      duration: 'Sleep Duration',
+      regularity: 'Sleep Regularity',
+      satisfaction: 'Sleep Satisfaction',
+      continuity: 'Sleep Continuity',
+      alertness: 'Daytime Alertness & Recovery',
+      timing: 'Sleep Timing & Alignment',
+    };
+
+    function formatDate(iso) {
+      if (!iso) return '';
+      return new Date(iso).toLocaleDateString('en-US', {
+        month: 'long', day: 'numeric', year: 'numeric',
+      });
+    }
+
+    async function init() {
+      try {
+        // ── Fetch Supabase config ──
+        const configRes = await fetch('/api/auth-config');
+        if (!configRes.ok) throw new Error('Could not load config');
+        const { url, anonKey } = await configRes.json();
+
+        supabase = createClient(url, anonKey, {
+          auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+        });
+
+        // ── Check auth state ──
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          window.location.href = '/register';
+          return;
+        }
+
+        // ── Sign out handler ──
+        document.getElementById('signout-btn').addEventListener('click', async () => {
+          await supabase.auth.signOut();
+          window.location.href = '/';
+        });
+
+        // ── Fetch dashboard data ──
+        const dashRes = await fetch('/api/dashboard', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+
+        if (!dashRes.ok) {
+          const err = await dashRes.json().catch(() => ({}));
+          throw new Error(err.error || 'Could not load dashboard');
+        }
+
+        const data = await dashRes.json();
+        renderDashboard(data);
+      } catch (err) {
+        app.innerHTML = `<div class="loading" style="color:var(--danger)">${escHtml(err.message || 'Something went wrong.')}</div>`;
+      }
+    }
+
+    function renderDashboard(data) {
+      const { user, participant, assessments } = data;
+
+      if (!assessments || assessments.length === 0) {
+        app.innerHTML = `
+          <div class="empty-state">
+            <h2>Welcome${participant?.preferredName ? ', ' + escHtml(participant.preferredName) : ''}</h2>
+            <p>You haven't completed any assessments yet. Take your first Sleep &amp; Recovery assessment to get started.</p>
+            <a class="start-btn" href="/#signup">Start your first assessment</a>
+          </div>
+        `;
+        return;
+      }
+
+      const completed = assessments.filter(a => a.status === 'completed');
+      const inProgress = assessments.filter(a => a.status === 'started' || a.status === 'invited');
+
+      let html = `
+        <div class="eyebrow">Your dashboard</div>
+        <h1>Welcome${participant?.preferredName ? ', ' + escHtml(participant.preferredName) : ''}</h1>
+        <p class="muted" style="font-size:15px;margin:0 0 28px">You have ${completed.length} completed ${completed.length === 1 ? 'assessment' : 'assessments'}${inProgress.length ? ` and ${inProgress.length} in progress` : ''}.</p>
+      `;
+
+      // ── Completed assessments ──
+      for (const a of completed) {
+        const summary = a.resultSummary || {};
+        const domains = a.domainScores || [];
+
+        html += `
+          <div class="card">
+            <div class="assessment-name">${escHtml(a.type?.name || 'Assessment')} · v${a.type?.version || ''}</div>
+            <div class="score-row">
+              <span class="score-big">${Math.round(Number(a.overallScore || 0))}<small>/100</small></span>
+            </div>
+            <div class="completed-date">Completed ${formatDate(a.completedAt)}</div>
+            <p class="muted" style="font-size:14px;line-height:1.6;margin:0 0 16px">${escHtml(summary.description || '')}</p>
+        `;
+
+        // ── Domain scores ──
+        if (domains.length > 0) {
+          html += `<h2>Your scores</h2>`;
+          for (const d of domains) {
+            const label = DOMAIN_LABELS[d.domain] || d.domain;
+            const pct = Math.max(0, Math.min(100, Number(d.score || 0)));
+            html += `
+              <div class="domain">
+                <div class="domain-head">
+                  <span>${escHtml(label)}</span>
+                  <strong>${Math.round(pct)}/100</strong>
+                </div>
+                <div class="bar"><span style="width:${pct}%"></span></div>
+              </div>
+            `;
+          }
+        }
+
+        // ── Strongest / weakest ──
+        if (summary.strongest_domain_label || summary.weakest_domain_label) {
+          html += `<div class="result-box">`;
+          if (summary.strongest_domain_label) {
+            html += `<h3>Strongest area</h3><div class="muted">${escHtml(summary.strongest_domain_label)}</div>`;
+          }
+          if (summary.weakest_domain_label) {
+            html += `<h3 style="margin-top:12px">Biggest opportunity</h3><div class="muted">${escHtml(summary.weakest_domain_label)}</div>`;
+          }
+          html += `</div>`;
+        }
+
+        // ── Warnings ──
+        const warnings = summary.warnings || [];
+        for (const w of warnings) {
+          html += `<div class="warning ${w.level === 'important' ? 'important' : ''}"><strong>${escHtml(w.title)}</strong> — ${escHtml(w.text)}</div>`;
+        }
+
+        // ── Recommendations ──
+        const recs = summary.recommendations || [];
+        if (recs.length > 0) {
+          html += `<h2 style="margin-top:22px">Personalized recommendations</h2><div class="recs">`;
+          for (let i = 0; i < recs.length; i++) {
+            html += `<div class="rec"><h3>${i + 1}. ${escHtml(recs[i].title)}</h3><div class="muted" style="font-size:13px;line-height:1.6">${escHtml(recs[i].text)}</div></div>`;
+          }
+          html += `</div>`;
+        }
+
+        html += `</div>`;
+      }
+
+      // ── In-progress assessments ──
+      for (const a of inProgress) {
+        html += `
+          <div class="card">
+            <div class="assessment-name">${escHtml(a.type?.name || 'Assessment')} · In progress</div>
+            <p class="muted" style="font-size:14px;margin:0">Started ${formatDate(a.startedAt)}</p>
+            <a class="start-btn" href="/a/${a.accessToken}" style="margin-top:16px">Continue assessment</a>
+          </div>
+        `;
+      }
+
+      // ── CTA: take another assessment ──
+      if (completed.length > 0) {
+        html += `
+          <div class="card" style="text-align:center;border-style:dashed">
+            <h2>Want to learn more?</h2>
+            <p class="muted" style="font-size:14px;margin:0 0 20px">More assessments are coming soon. We'll let you know when they're ready.</p>
+          </div>
+        `;
+      }
+
+      app.innerHTML = html;
+    }
+
+    init();
+  </script>
+</body>
+</html>
