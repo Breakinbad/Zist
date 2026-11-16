@@ -334,8 +334,8 @@ export default async function handler(req, res) {
                     font-weight: 500;
                     margin: 0 0 28px;
                   ">
-                    Feel better.<br>
-                    Know why.
+                    Know what to change.<br>
+                    See how you improve.
                   </h1>
 
                   <p style="
@@ -413,7 +413,7 @@ export default async function handler(req, res) {
                     font-size: 13px;
                     color: #78857f;
                   ">
-                    ZIST · Feel better. Know why.<br>
+                    ZIST · Know what to change. See how you improve.<br>
                     zisthealth.com
                   </div>
 

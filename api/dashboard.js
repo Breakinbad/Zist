@@ -1,8 +1,14 @@
 // Returns the authenticated user's assessment history and dashboard data.
 //
-// GET  Authorization: Bearer <supabase access token>
+// GET  Authorization: Bearer <access token>
+//   → assessment instances + domain scores for the linked participant.
 //
-// Uses the service role key (bypasses RLS) to fetch all assessments
+// POST Authorization: Bearer <access token>
+//   → creates a new 'invited' Sleep & Recovery assessment instance for the
+//     linked participant and returns its access token so the dashboard can
+//     redirect to /a/<token>.
+//
+// Uses the service role key (bypasses RLS) to read and create assessments
 // linked to the authenticated user's participant record.
 
 import { createClient } from '@supabase/supabase-js';
@@ -13,42 +19,58 @@ const supabaseSecretKey =
   process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export default async function handler(req, res) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method === 'GET') {
+    return getDashboard(req, res);
+  }
+  if (req.method === 'POST') {
+    return createReassessment(req, res);
+  }
+  return res.status(405).json({ error: 'Method not allowed' });
+}
+
+// ── Shared: verify the JWT and resolve the linked participant ──
+async function verifyAuth(accessToken) {
+  if (!accessToken) {
+    return { error: { status: 401, body: { error: 'Authentication required' } } };
   }
 
+  const supabase = createClient(supabaseUrl, supabaseSecretKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const { data: userData, error: userError } =
+    await supabase.auth.getUser(accessToken);
+
+  if (userError || !userData?.user) {
+    return { error: { status: 401, body: { error: 'Invalid or expired session' } } };
+  }
+
+  const authUserId = userData.user.id;
+
+  const { data: participant, error: participantError } = await supabase
+    .from('participants')
+    .select('id, preferred_name, email')
+    .eq('user_id', authUserId)
+    .maybeSingle();
+
+  if (participantError) {
+    return { error: { status: 500, body: { error: participantError.message } } };
+  }
+
+  return { supabase, authUserId, userData, participant };
+}
+
+async function getDashboard(req, res) {
   try {
     // ── Verify the user's JWT ──
     const authHeader = req.headers['authorization'] || '';
     const accessToken = authHeader.replace(/^Bearer\s+/i, '');
 
-    if (!accessToken) {
-      return res.status(401).json({ error: 'Authentication required' });
+    const authed = await verifyAuth(accessToken);
+    if (authed.error) {
+      return res.status(authed.error.status).json(authed.error.body);
     }
-
-    const supabase = createClient(supabaseUrl, supabaseSecretKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-
-    const { data: userData, error: userError } =
-      await supabase.auth.getUser(accessToken);
-
-    if (userError || !userData?.user) {
-      return res.status(401).json({ error: 'Invalid or expired session' });
-    }
-
-    const authUserId = userData.user.id;
-
-    // ── Find the participant record linked to this auth user ──
-    const { data: participant, error: participantError } = await supabase
-      .from('participants')
-      .select('id, preferred_name, email')
-      .eq('user_id', authUserId)
-      .maybeSingle();
-
-    if (participantError) {
-      throw participantError;
-    }
+    const { supabase, userData, participant } = authed;
 
     if (!participant) {
       // User exists but hasn't been linked to any assessments yet
@@ -151,6 +173,72 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error('Dashboard API error:', error);
+    return res
+      .status(500)
+      .json({ error: 'Something went wrong. Please try again.' });
+  }
+}
+
+async function createReassessment(req, res) {
+  try {
+    // ── Verify the user's JWT ──
+    const authHeader = req.headers['authorization'] || '';
+    const accessToken = authHeader.replace(/^Bearer\s+/i, '');
+
+    const authed = await verifyAuth(accessToken);
+    if (authed.error) {
+      return res.status(authed.error.status).json(authed.error.body);
+    }
+    const { supabase, participant } = authed;
+
+    if (!participant) {
+      // No linked participant — can't create an assessment for this account
+      return res.status(403).json({
+        error: 'No participant record is linked to this account.',
+      });
+    }
+
+    // ── Get the latest active sleep-recovery assessment type ──
+    const { data: assessmentType, error: assessmentTypeError } = await supabase
+      .from('assessment_types')
+      .select('id, slug, name, version')
+      .eq('slug', 'sleep-recovery')
+      .eq('active', true)
+      .order('version', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (assessmentTypeError) {
+      throw assessmentTypeError;
+    }
+
+    if (!assessmentType) {
+      return res.status(404).json({
+        error: 'No active Sleep & Recovery assessment type is configured.',
+      });
+    }
+
+    // ── Create a new 'invited' assessment instance ──
+    const { data: instance, error: instanceError } = await supabase
+      .from('assessment_instances')
+      .insert({
+        participant_id: participant.id,
+        assessment_type_id: assessmentType.id,
+        status: 'invited',
+      })
+      .select()
+      .single();
+
+    if (instanceError) {
+      throw instanceError;
+    }
+
+    return res.status(200).json({
+      success: true,
+      accessToken: instance.access_token,
+    });
+  } catch (error) {
+    console.error('Reassessment API error:', error);
     return res
       .status(500)
       .json({ error: 'Something went wrong. Please try again.' });

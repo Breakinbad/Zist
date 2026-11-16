@@ -500,6 +500,39 @@
 
       prefillProfile();
 
+      // -----------------------------------
+      // Restore saved progress (resume)
+      // -----------------------------------
+
+      const savedResponses =
+        assessment.responses || [];
+
+      if (
+        assessment.status ===
+          'started' &&
+        Array.isArray(savedResponses) &&
+        savedResponses.length
+      ) {
+        for (
+          const r
+            of savedResponses
+        ) {
+          const key =
+            r.assessment_questions
+              ?.question_key;
+
+          if (
+            key &&
+            r.answer !==
+              null &&
+            r.answer !== undefined
+          ) {
+            state.answers[key] =
+              r.answer;
+          }
+        }
+      }
+
 
       // -----------------------------------
       // Already completed assessment
@@ -577,6 +610,13 @@
         : '';
 
 
+    const hasSavedProgress =
+      (state.payload?.responses || [])
+        .length > 0 &&
+      state.payload?.instance
+        ?.status === 'started';
+
+
     app.innerHTML = `
 
       <div class="eyebrow">
@@ -627,7 +667,11 @@
         id="begin"
         class="primary"
       >
-        Begin assessment
+        ${
+          hasSavedProgress
+            ? 'Resume assessment'
+            : 'Begin assessment'
+        }
       </button>
 
 
@@ -671,8 +715,50 @@
             return;
           }
 
-          state.index = 0;
+          if (hasSavedProgress) {
+            const qs =
+              visibleQuestions();
 
+            let resumeIndex = 0;
+
+            for (
+              let i = 0;
+              i < qs.length;
+              i++
+            ) {
+              const a =
+                state.answers[
+                  qs[i].question_key
+                ];
+
+              if (
+                a === null ||
+                a === undefined ||
+                a === '' ||
+                (Array.isArray(a) &&
+                  !a.length) ||
+                (a &&
+                  Array.isArray(
+                    a.values
+                  ) &&
+                  !a.values.length)
+              ) {
+                resumeIndex = i;
+                break;
+              }
+
+              resumeIndex = i;
+            }
+
+            state.index =
+              Math.min(
+                resumeIndex,
+                qs.length - 1
+              );
+          } else {
+            state.index = 0;
+          }
+          track('assessment_started', { resumed: hasSavedProgress });
           renderQuestion();
         }
       );
@@ -815,6 +901,8 @@
         'click',
         () => {
 
+          autoSave();
+
           state.index--;
 
           renderQuestion();
@@ -855,6 +943,7 @@
             );
           }
 
+          autoSave();
 
           const currentQuestions =
             visibleQuestions();
@@ -1439,6 +1528,81 @@
 
 
   // -------------------------------------------------------
+  // AUTO-SAVE (partial progress)
+  // -------------------------------------------------------
+
+  function autoSave() {
+    if (!token) {
+      return;
+    }
+
+    if (
+      state.payload?.instance
+        ?.status === 'completed'
+    ) {
+      return;
+    }
+
+    try {
+      fetch(
+        '/api/assessment/save',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type':
+              'application/json',
+          },
+          body: JSON.stringify({
+            token,
+            answers: state.answers,
+          }),
+        }
+      ).catch(() => {});
+    } catch (e) {
+      // best-effort; ignore
+    }
+  }
+
+  window.addEventListener(
+    'beforeunload',
+    () => {
+      if (!token) {
+        return;
+      }
+
+      if (
+        state.payload?.instance
+          ?.status === 'completed'
+      ) {
+        return;
+      }
+
+      try {
+        const blob = new Blob(
+          [
+            JSON.stringify({
+              token,
+              answers: state.answers,
+            }),
+          ],
+          {
+            type:
+              'application/json',
+          }
+        );
+
+        navigator.sendBeacon(
+          '/api/assessment/save',
+          blob
+        );
+      } catch (e) {
+        // best-effort; ignore
+      }
+    }
+  );
+
+
+  // -------------------------------------------------------
   // SUBMIT
   // -------------------------------------------------------
 
@@ -1502,6 +1666,8 @@
       renderResults(
         data.result
       );
+
+      track('assessment_completed');
 
     } catch (error) {
 
@@ -1884,6 +2050,31 @@
       </div>
     `;
   }
+
+
+  // -------------------------------------------------------
+  // PRIVACY-CONSCIOUS ANALYTICS
+  // No PII, answers, or health scores are ever sent.
+  // -------------------------------------------------------
+
+  function track(eventType, metadata) {
+    try {
+      fetch('/api/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventType, metadata: metadata || {} }),
+      }).catch(() => {});
+    } catch (e) { /* best-effort */ }
+  }
+
+  track('page_view', { page: 'assessment' });
+
+  // Track abandonment when the user leaves mid-assessment
+  window.addEventListener('beforeunload', () => {
+    if (state.payload?.instance?.status !== 'completed' && Object.keys(state.answers).length > 0) {
+      track('assessment_abandoned', { answered: Object.keys(state.answers).length });
+    }
+  });
 
 
   load();

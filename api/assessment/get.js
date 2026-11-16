@@ -66,7 +66,10 @@ export default async function handler(req, res) {
     let domainScores = [];
     let responses = [];
 
-    if (instance.status === 'completed') {
+    if (
+      instance.status === 'completed' ||
+      instance.status === 'started'
+    ) {
       const { data: scoreData, error: scoreError } = await supabase
         .from('assessment_domain_scores')
         .select('domain, score, max_score')

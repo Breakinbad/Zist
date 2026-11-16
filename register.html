@@ -212,6 +212,7 @@
 
         // ── Authenticated — link assessment if we have a token ──
         if (result.data?.session) {
+          track('register_success', { mode: isSignUp ? 'signup' : 'signin' });
           if (assessmentToken) {
             btn.textContent = 'Saving your results…';
             await linkAssessment(result.data.session.access_token);
@@ -219,6 +220,7 @@
           redirectToDashboard();
         }
       } catch (err) {
+        track('register_error', { mode: isSignUp ? 'signup' : 'signin' });
         errEl.textContent = err.message || 'Something went wrong. Please try again.';
         errEl.style.display = 'block';
         btn.disabled = false;
@@ -246,6 +248,17 @@
     function redirectToDashboard() {
       window.location.href = '/dashboard';
     }
+
+    // ── Privacy-conscious analytics ──
+    // No PII, answers, or health scores are ever sent.
+    function track(eventType, metadata) {
+      fetch('/api/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventType, metadata: metadata || {} }),
+      }).catch(() => {});
+    }
+    track('page_view', { page: 'register' });
 
     init();
   </script>
